@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#6b4e71">
+  <title>Events - Event Planner</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="top-row">
+      <h1>Events & Functions</h1>
+    </div>
+    <div class="subtitle" id="eventSubtitle"></div>
+  </header>
+
+  <div class="container" id="mainContent">
+    <!-- filled by JS -->
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="index.html" class="nav-item">
+      <span class="icon">📊</span>
+      Dashboard
+    </a>
+    <a href="guests.html" class="nav-item">
+      <span class="icon">👥</span>
+      Guests
+    </a>
+    <a href="events.html" class="nav-item active">
+      <span class="icon">📅</span>
+      Events
+    </a>
+    <a href="documents.html" class="nav-item">
+      <span class="icon">📄</span>
+      Docs
+    </a>
+    <a href="share.html" class="nav-item">
+      <span class="icon">📤</span>
+      Share
+    </a>
+  </nav>
+
+  <!-- Add Sub-Event Modal -->
+  <div class="modal-overlay" id="subEventModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Add Sub-Event / Function</h3>
+        <button class="btn btn-sm btn-outline" onclick="closeSubEventModal()">Close</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Function Name *</label>
+          <input type="text" class="form-control" id="subEventName" placeholder="e.g. Haldi, Mehendi, Sangeet, Reception">
+        </div>
+        <div class="form-group">
+          <label>Date (optional)</label>
+          <input type="date" class="form-control" id="subEventDate">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeSubEventModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveSubEvent()">Add Function</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    function render() {
+      const event = App.getCurrentEvent();
+      const container = document.getElementById('mainContent');
+      const sub = document.getElementById('eventSubtitle');
+
+      if (!event) {
+        sub.textContent = '';
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📅</div>
+            <p>No event selected.</p>
+            <a href="index.html" class="btn btn-primary">Go to Dashboard</a>
+          </div>`;
+        return;
+      }
+
+      sub.textContent = event.name;
+
+      container.innerHTML = `
+        <div class="card">
+          <div class="card-title">Main Event</div>
+          <div class="flex-between">
+            <div>
+              <strong style="font-size:1.15rem">${event.name}</strong>
+              ${event.date ? `<div class="text-sm text-muted">${event.date}</div>` : ''}
+            </div>
+          </div>
+          <div class="text-sm text-muted mt-1">
+            ${event.guests.length} families · ${event.subEvents.length} functions
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex-between mb-1">
+            <div class="card-title" style="margin:0">Sub-Events / Functions</div>
+            <button class="btn btn-sm btn-primary" onclick="showAddSubEvent()">+ Add</button>
+          </div>
+          <p class="text-sm text-muted mb-2">
+            Each function can have its own invite list. Guests can be marked Invited / Confirmed / Attended per function.
+          </p>
+          ${event.subEvents.map(se => {
+            const stats = App.getEventStats(event, se.id);
+            return `
+              <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+                <div class="flex-between">
+                  <div>
+                    <strong>${se.name}</strong>
+                    ${se.isDefault ? '<span class="badge badge-invited" style="margin-left:6px">Default</span>' : ''}
+                    ${se.date ? `<div class="text-sm text-muted">${se.date}</div>` : ''}
+                  </div>
+                  <div class="text-sm text-muted" style="text-align:right">
+                    ${stats.invited} invited<br>
+                    ${stats.confirmed} confirmed<br>
+                    ${stats.attended} attended
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <div class="card">
+          <div class="card-title">How it works</div>
+          <ul style="padding-left:18px;font-size:0.9rem;color:var(--text-muted)">
+            <li style="margin-bottom:6px">Create functions like Haldi, Mehendi, Wedding, Reception</li>
+            <li style="margin-bottom:6px">Go to Guests page and select a function tab</li>
+            <li style="margin-bottom:6px">Mark who is invited / confirmed / attended for that function</li>
+            <li>Guest list can be different for each function</li>
+          </ul>
+        </div>
+      `;
+    }
+
+    function showAddSubEvent() {
+      document.getElementById('subEventName').value = '';
+      document.getElementById('subEventDate').value = '';
+      document.getElementById('subEventModal').classList.add('show');
+    }
+
+    function closeSubEventModal() {
+      document.getElementById('subEventModal').classList.remove('show');
+    }
+
+    function saveSubEvent() {
+      const name = document.getElementById('subEventName').value.trim();
+      if (!name) {
+        alert('Please enter a name');
+        return;
+      }
+      const event = App.getCurrentEvent();
+      if (!event) return;
+      const date = document.getElementById('subEventDate').value;
+      App.addSubEvent(event.id, name, date);
+
+      // Also initialize status for existing guests
+      const data = App.loadData();
+      const ev = data.events.find(e => e.id === event.id);
+      const newSub = ev.subEvents[ev.subEvents.length - 1];
+      ev.guests.forEach(g => {
+        if (!g.subEventStatus) g.subEventStatus = {};
+        g.subEventStatus[newSub.id] = { invited: false, confirmed: false, attended: false };
+      });
+      App.saveData(data);
+
+      closeSubEventModal();
+      render();
+    }
+
+    render();
+  </script>
+</body>
+</html>

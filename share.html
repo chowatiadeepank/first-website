@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#6b4e71">
+  <title>Share & Export - Event Planner</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="top-row">
+      <h1>Share & Export</h1>
+    </div>
+    <div class="subtitle" id="eventSubtitle"></div>
+  </header>
+
+  <div class="container" id="mainContent">
+    <!-- filled by JS -->
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="index.html" class="nav-item">
+      <span class="icon">📊</span>
+      Dashboard
+    </a>
+    <a href="guests.html" class="nav-item">
+      <span class="icon">👥</span>
+      Guests
+    </a>
+    <a href="events.html" class="nav-item">
+      <span class="icon">📅</span>
+      Events
+    </a>
+    <a href="documents.html" class="nav-item">
+      <span class="icon">📄</span>
+      Docs
+    </a>
+    <a href="share.html" class="nav-item active">
+      <span class="icon">📤</span>
+      Share
+    </a>
+  </nav>
+
+  <script src="js/app.js"></script>
+  <script>
+    function render() {
+      const event = App.getCurrentEvent();
+      const container = document.getElementById('mainContent');
+      const sub = document.getElementById('eventSubtitle');
+
+      if (!event) {
+        sub.textContent = '';
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📤</div>
+            <p>No event selected.</p>
+            <a href="index.html" class="btn btn-primary">Go to Dashboard</a>
+          </div>`;
+        return;
+      }
+
+      sub.textContent = event.name;
+
+      container.innerHTML = `
+        <div class="card">
+          <div class="card-title">Export Guest List</div>
+          <p class="text-sm text-muted mb-2">
+            Download the full guest list or a filtered version as CSV (open in Excel) or print-friendly HTML.
+          </p>
+
+          <div class="form-group">
+            <label>Select Function (optional)</label>
+            <select class="form-control" id="exportSubEvent">
+              <option value="">All / Overall</option>
+              ${event.subEvents.map(se => `<option value="${se.id}">${se.name}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Include columns</label>
+            <div class="checkbox-group">
+              <input type="checkbox" id="exp_returnGift" checked>
+              <label for="exp_returnGift">Return Gift</label>
+            </div>
+            <div class="checkbox-group">
+              <input type="checkbox" id="exp_shagan" checked>
+              <label for="exp_shagan">Shagan</label>
+            </div>
+            <div class="checkbox-group">
+              <input type="checkbox" id="exp_rooms" checked>
+              <label for="exp_rooms">Rooms</label>
+            </div>
+            <div class="checkbox-group">
+              <input type="checkbox" id="exp_status" checked>
+              <label for="exp_status">Invited / Confirmed / Attended</label>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
+            <button class="btn btn-primary btn-block" onclick="exportCSV()">📥 Download CSV (Excel)</button>
+            <button class="btn btn-outline btn-block" onclick="exportPrintView()">🖨️ Print / PDF View</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Quick Share Lists for Managers</div>
+          <p class="text-sm text-muted mb-2">
+            Generate focused lists for Room Manager, Travel Manager etc. and share via WhatsApp or any app.
+          </p>
+
+          <button class="btn btn-outline btn-block mb-1" onclick="exportRoomList()">
+            🛏️ Room Allotment List
+          </button>
+          <button class="btn btn-outline btn-block mb-1" onclick="exportGiftList()">
+            🎁 Return Gift Status List
+          </button>
+          <button class="btn btn-outline btn-block" onclick="exportConfirmedList()">
+            ✅ Confirmed Guests List
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Backup Entire Event</div>
+          <p class="text-sm text-muted mb-2">
+            Download a full backup file. You can import it later on any device to restore everything.
+          </p>
+          <button class="btn btn-accent btn-block" onclick="exportFullBackup()">💾 Download Full Backup (JSON)</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Restore from Backup</div>
+          <input type="file" id="restoreFile" accept=".json" class="form-control mb-1">
+          <button class="btn btn-outline btn-block" onclick="restoreBackup()">Restore</button>
+        </div>
+      `;
+    }
+
+    function exportCSV() {
+      const event = App.getCurrentEvent();
+      if (!event) return;
+      const subId = document.getElementById('exportSubEvent').value || null;
+      const csv = App.exportGuestsToCSV(event, subId);
+      const name = (event.name || 'guests').replace(/[^a-z0-9]/gi, '_');
+      App.downloadFile(csv, `${name}_guestlist.csv`, 'text/csv;charset=utf-8');
+    }
+
+    function exportPrintView() {
+      const event = App.getCurrentEvent();
+      if (!event) return;
+      const subId = document.getElementById('exportSubEvent').value || null;
+      const subName = subId ? (event.subEvents.find(s => s.id === subId)?.name || '') : 'Overall';
+
+      let rows = event.guests.map(g => {
+        const st = subId ? ((g.subEventStatus && g.subEventStatus[subId]) || {}) : {};
+        return `
+          <tr>
+            <td>${g.headName || ''}</td>
+            <td>${g.phone || ''}</td>
+            <td style="text-align:center">${g.totalPeople || 1}</td>
+            <td>${(g.members || []).join(', ')}</td>
+            <td style="text-align:center">${g.rooms || 0}</td>
+            <td style="text-align:center">${g.returnGift ? '✓' : ''}</td>
+            <td style="text-align:right">${g.shagan ? '₹' + g.shagan : ''}</td>
+            <td style="text-align:center">${st.invited ? '✓' : ''}</td>
+            <td style="text-align:center">${st.confirmed ? '✓' : ''}</td>
+            <td style="text-align:center">${st.attended ? '✓' : ''}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${event.name} - Guest List</title>
+          <style>
+            body { font-family: system-ui, sans-serif; padding: 20px; font-size: 13px; }
+            h1 { font-size: 18px; margin-bottom: 4px; }
+            .meta { color: #666; margin-bottom: 16px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+            th { background: #f0f0f0; font-weight: 600; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>${event.name}</h1>
+          <div class="meta">Function: ${subName} · Generated: ${new Date().toLocaleString('en-IN')}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Family Head</th>
+                <th>Phone</th>
+                <th>People</th>
+                <th>Members</th>
+                <th>Rooms</th>
+                <th>Gift</th>
+                <th>Shagan</th>
+                <th>Inv</th>
+                <th>Conf</th>
+                <th>Att</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <script>window.onload = function(){ window.print(); }<\/script>
+        </body>
+        </html>
+      `;
+
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+    }
+
+    function exportRoomList() {
+      const event = App.getCurrentEvent();
+      if (!event) return;
+      const withRooms = event.guests.filter(g => (g.rooms || 0) > 0);
+      let csv = 'Family Head,Phone,Rooms,Room Type,Total People,Members\n';
+      withRooms.forEach(g => {
+        csv += `"${g.headName}","${g.phone || ''}",${g.rooms},"${g.roomType || ''}",${g.totalPeople || 1},"${(g.members||[]).join('; ')}"\n`;
+      });
+      App.downloadFile(csv, `${event.name}_rooms.csv`);
+    }
+
+    function exportGiftList() {
+      const event = App.getCurrentEvent();
+      if (!event) return;
+      let csv = 'Family Head,Phone,Return Gift Given,Shagan Received,Total People\n';
+      event.guests.forEach(g => {
+        csv += `"${g.headName}","${g.phone || ''}",${g.returnGift ? 'Yes' : 'No'},${g.shagan || 0},${g.totalPeople || 1}\n`;
+      });
+      App.downloadFile(csv, `${event.name}_gifts.csv`);
+    }
+
+    function exportConfirmedList() {
+      const event = App.getCurrentEvent();
+      if (!event) return;
+      // Use first sub-event or overall
+      const subId = event.subEvents[0]?.id;
+      let csv = 'Family Head,Phone,Total People,Members,Confirmed,Attended\n';
+      event.guests.forEach(g => {
+        const st = (g.subEventStatus && g.subEventStatus[subId]) || {};
+        if (st.confirmed || st.attended) {
+          csv += `"${g.headName}","${g.phone || ''}",${g.totalPeople || 1},"${(g.members||[]).join('; ')}",${st.confirmed?'Yes':'No'},${st.attended?'Yes':'No'}\n`;
+        }
+      });
+      App.downloadFile(csv, `${event.name}_confirmed.csv`);
+    }
+
+    function exportFullBackup() {
+      const data = App.loadData();
+      const event = App.getCurrentEvent();
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        event: event
+      };
+      App.downloadFile(JSON.stringify(payload, null, 2), `${event.name}_backup.json`, 'application/json');
+    }
+
+    function restoreBackup() {
+      const fileInput = document.getElementById('restoreFile');
+      if (!fileInput.files.length) {
+        alert('Select a backup JSON file first');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          const eventData = parsed.event || parsed;
+          if (!eventData.name || !eventData.id) {
+            alert('Invalid backup file');
+            return;
+          }
+          const data = App.loadData();
+          // Replace or add
+          const idx = data.events.findIndex(e => e.id === eventData.id);
+          if (idx >= 0) {
+            data.events[idx] = eventData;
+          } else {
+            data.events.push(eventData);
+          }
+          data.currentEventId = eventData.id;
+          App.saveData(data);
+          alert('Event restored successfully!');
+          window.location.href = 'index.html';
+        } catch (err) {
+          alert('Could not read backup file');
+        }
+      };
+      reader.readAsText(fileInput.files[0]);
+    }
+
+    render();
+  </script>
+</body>
+</html>

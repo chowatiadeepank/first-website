@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#6b4e71">
+  <title>Guest List - Event Planner</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="top-row">
+      <h1>Guest List</h1>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:white" onclick="showImportModal()">Import</button>
+        <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:white" onclick="showColumnConfig()">Columns</button>
+      </div>
+    </div>
+    <div class="subtitle" id="eventSubtitle"></div>
+  </header>
+
+  <!-- Sub-event tabs -->
+  <div class="subevent-tabs" id="subEventTabs"></div>
+
+  <!-- Summary -->
+  <div class="summary-bar" id="summaryBar"></div>
+
+  <div class="container">
+    <div class="search-bar">
+      <input type="search" class="form-control" id="searchInput" placeholder="Search name or phone..." oninput="renderGuestList()">
+      <button class="btn btn-primary btn-sm" onclick="showAddGuest()">+ Add</button>
+    </div>
+
+    <div class="filter-chips" id="filterChips">
+      <button class="chip active" data-filter="all" onclick="setFilter('all')">All</button>
+      <button class="chip" data-filter="invited" onclick="setFilter('invited')">Invited</button>
+      <button class="chip" data-filter="confirmed" onclick="setFilter('confirmed')">Confirmed</button>
+      <button class="chip" data-filter="attended" onclick="setFilter('attended')">Attended</button>
+      <button class="chip" data-filter="no-gift" onclick="setFilter('no-gift')">Gift Pending</button>
+      <button class="chip" data-filter="has-rooms" onclick="setFilter('has-rooms')">Has Rooms</button>
+    </div>
+
+    <div id="guestList"></div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" onclick="showAddGuest()">+</button>
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <a href="index.html" class="nav-item">
+      <span class="icon">📊</span>
+      Dashboard
+    </a>
+    <a href="guests.html" class="nav-item active">
+      <span class="icon">👥</span>
+      Guests
+    </a>
+    <a href="events.html" class="nav-item">
+      <span class="icon">📅</span>
+      Events
+    </a>
+    <a href="documents.html" class="nav-item">
+      <span class="icon">📄</span>
+      Docs
+    </a>
+    <a href="share.html" class="nav-item">
+      <span class="icon">📤</span>
+      Share
+    </a>
+  </nav>
+
+  <!-- Add / Edit Guest Modal -->
+  <div class="modal-overlay" id="guestModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="guestModalTitle">Add Family</h3>
+        <button class="btn btn-sm btn-outline" onclick="closeGuestModal()">Close</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editingGuestId">
+        <div class="form-group">
+          <label>Family Head Name *</label>
+          <input type="text" class="form-control" id="headName" placeholder="e.g. Rajesh Sharma">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Contact Number</label>
+            <input type="tel" class="form-control" id="phone" placeholder="98765 43210">
+          </div>
+          <div class="form-group">
+            <label>Total People</label>
+            <input type="number" class="form-control" id="totalPeople" min="1" value="1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Individual Members (optional)</label>
+          <input type="text" class="form-control" id="members" placeholder="Comma separated: Rajesh, Priya, Aryan">
+        </div>
+        <div class="form-group" id="addressGroup">
+          <label>Address</label>
+          <input type="text" class="form-control" id="address" placeholder="City / Area">
+        </div>
+        <div class="form-row" id="shaganRoomsRow">
+          <div class="form-group" id="shaganGroup">
+            <label>Shagan Received (₹)</label>
+            <input type="number" class="form-control" id="shagan" min="0" value="0">
+          </div>
+          <div class="form-group" id="roomsGroup">
+            <label>Rooms Allotted</label>
+            <input type="number" class="form-control" id="rooms" min="0" value="0">
+          </div>
+        </div>
+        <div class="form-group" id="roomTypeGroup">
+          <label>Room Type</label>
+          <input type="text" class="form-control" id="roomType" placeholder="Deluxe / Suite / etc.">
+        </div>
+        <div class="checkbox-group" id="returnGiftGroup">
+          <input type="checkbox" id="returnGift">
+          <label for="returnGift">Return Gift Given</label>
+        </div>
+        <div class="form-group" id="sideGroup" style="display:none">
+          <label>Side</label>
+          <select class="form-control" id="side">
+            <option value="">—</option>
+            <option value="Bride">Bride</option>
+            <option value="Groom">Groom</option>
+            <option value="Host">Host</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group" id="notesGroup" style="display:none">
+          <label>Notes</label>
+          <textarea class="form-control" id="notes" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeGuestModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveGuest()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Column Config Modal -->
+  <div class="modal-overlay" id="columnModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Visible Columns</h3>
+        <button class="btn btn-sm btn-outline" onclick="closeColumnConfig()">Close</button>
+      </div>
+      <div class="modal-body">
+        <p class="text-sm text-muted mb-2">Turn columns on/off. Changes apply to this event.</p>
+        <div class="checkbox-group">
+          <input type="checkbox" id="col_returnGift" checked>
+          <label for="col_returnGift">Return Gift</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="col_shagan" checked>
+          <label for="col_shagan">Shagan Received</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="col_rooms" checked>
+          <label for="col_rooms">Rooms Allotted</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="col_address" checked>
+          <label for="col_address">Address</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="col_side">
+          <label for="col_side">Side (Bride/Groom)</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="col_notes">
+          <label for="col_notes">Notes</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-block" onclick="saveColumnConfig()">Save Columns</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div class="modal-overlay" id="importModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Import Guests</h3>
+        <button class="btn btn-sm btn-outline" onclick="closeImportModal()">Close</button>
+      </div>
+      <div class="modal-body">
+        <p class="text-sm text-muted mb-2">
+          Upload a CSV or Excel (.csv recommended). First row should be headers.<br>
+          Supported columns: Head Name / Name, Phone, Total People / People, Members, Address, Shagan, Rooms, Room Type
+        </p>
+        <input type="file" id="importFile" accept=".csv,.txt" class="form-control">
+        <div id="importPreview" class="mt-2 text-sm"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeImportModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="doImport()">Import</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    let currentSubEventId = null;
+    let currentFilter = 'all';
+    let expandedGuestId = null;
+
+    function init() {
+      const event = App.getCurrentEvent();
+      if (!event) {
+        document.getElementById('guestList').innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📅</div>
+            <p>No event selected. Create or select an event first.</p>
+            <a href="index.html" class="btn btn-primary">Go to Dashboard</a>
+          </div>`;
+        return;
+      }
+
+      document.getElementById('eventSubtitle').textContent = event.name;
+
+      // Sub-event tabs
+      const tabs = document.getElementById('subEventTabs');
+      tabs.innerHTML = event.subEvents.map((se, i) => `
+        <button class="subevent-tab ${i === 0 ? 'active' : ''}" data-id="${se.id}" onclick="selectSubEvent('${se.id}')">
+          ${se.name}
+        </button>
+      `).join('');
+
+      if (event.subEvents.length) {
+        currentSubEventId = event.subEvents[0].id;
+      }
+
+      renderGuestList();
+    }
+
+    function selectSubEvent(id) {
+      currentSubEventId = id;
+      document.querySelectorAll('.subevent-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.id === id);
+      });
+      renderGuestList();
+    }
+
+    function setFilter(f) {
+      currentFilter = f;
+      document.querySelectorAll('.filter-chips .chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.filter === f);
+      });
+      renderGuestList();
+    }
+
+    function renderGuestList() {
+      const event = App.getCurrentEvent();
+      if (!event) return;
+
+      const search = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+      let guests = [...event.guests];
+
+      // Filter by search
+      if (search) {
+        guests = guests.filter(g =>
+          (g.headName || '').toLowerCase().includes(search) ||
+          (g.phone || '').includes(search) ||
+          (g.members || []).some(m => m.toLowerCase().includes(search))
+        );
+      }
+
+      // Filter by status
+      if (currentFilter !== 'all' && currentSubEventId) {
+        guests = guests.filter(g => {
+          const st = (g.subEventStatus && g.subEventStatus[currentSubEventId]) || {};
+          if (currentFilter === 'invited') return st.invited;
+          if (currentFilter === 'confirmed') return st.confirmed;
+          if (currentFilter === 'attended') return st.attended;
+          if (currentFilter === 'no-gift') return !g.returnGift;
+          if (currentFilter === 'has-rooms') return (g.rooms || 0) > 0;
+          return true;
+        });
+      } else if (currentFilter === 'no-gift') {
+        guests = guests.filter(g => !g.returnGift);
+      } else if (currentFilter === 'has-rooms') {
+        guests = guests.filter(g => (g.rooms || 0) > 0);
+      }
+
+      // Summary
+      const stats = App.getEventStats(event, currentSubEventId);
+      document.getElementById('summaryBar').innerHTML = `
+        <div class="item"><strong>${stats.totalFamilies}</strong>Families</div>
+        <div class="item"><strong>${stats.totalPeople}</strong>People</div>
+        <div class="item"><strong>${stats.confirmed}</strong>Confirmed</div>
+        <div class="item"><strong>${App.formatMoney(stats.totalShagan)}</strong>Shagan</div>
+      `;
+
+      const list = document.getElementById('guestList');
+      if (!guests.length) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">👥</div>
+            <p>No guests found. Add your first family or import a list.</p>
+            <button class="btn btn-primary" onclick="showAddGuest()">+ Add Family</button>
+          </div>`;
+        return;
+      }
+
+      const cfg = event.columnConfig || {};
+
+      list.innerHTML = guests.map(g => {
+        const st = (g.subEventStatus && g.subEventStatus[currentSubEventId]) || { invited: false, confirmed: false, attended: false };
+        const isExpanded = expandedGuestId === g.id;
+
+        return `
+          <div class="guest-card ${isExpanded ? 'expanded' : ''}" data-id="${g.id}">
+            <div class="guest-card-header" onclick="toggleGuest('${g.id}')">
+              <div class="info">
+                <div class="name">${g.headName || 'Unnamed'}</div>
+                <div class="meta">
+                  ${g.phone ? g.phone + ' · ' : ''}${g.totalPeople || 1} people
+                  ${cfg.rooms !== false && g.rooms ? ` · ${g.rooms} room${g.rooms > 1 ? 's' : ''}` : ''}
+                </div>
+              </div>
+              <div class="stats">
+                ${st.attended ? '<span class="badge badge-attended">Attended</span>' :
+                  st.confirmed ? '<span class="badge badge-confirmed">Confirmed</span>' :
+                  st.invited ? '<span class="badge badge-invited">Invited</span>' :
+                  '<span class="badge badge-pending">Not Invited</span>'}
+                ${cfg.shagan !== false && g.shagan ? `<div class="text-sm" style="margin-top:4px">${App.formatMoney(g.shagan)}</div>` : ''}
+              </div>
+            </div>
+            <div class="guest-card-body">
+              ${(g.members && g.members.length) ? `
+                <div class="member-list">
+                  ${g.members.map(m => `<span>${m}</span>`).join('')}
+                </div>` : ''}
+
+              ${cfg.address !== false && g.address ? `<div class="text-sm text-muted mb-1">📍 ${g.address}</div>` : ''}
+
+              <div class="status-row">
+                <button class="status-btn ${st.invited ? 'active' : ''}" onclick="event.stopPropagation(); toggleStatus('${g.id}','invited')">
+                  Invited
+                </button>
+                <button class="status-btn ${st.confirmed ? 'active' : ''}" onclick="event.stopPropagation(); toggleStatus('${g.id}','confirmed')">
+                  Confirmed
+                </button>
+                <button class="status-btn ${st.attended ? 'active' : ''}" onclick="event.stopPropagation(); toggleStatus('${g.id}','attended')">
+                  Attended
+                </button>
+              </div>
+
+              <div class="text-sm" style="display:flex;flex-wrap:wrap;gap:12px;margin:8px 0">
+                ${cfg.returnGift !== false ? `<span>🎁 Gift: <strong>${g.returnGift ? 'Given' : 'Pending'}</strong></span>` : ''}
+                ${cfg.rooms !== false ? `<span>🛏️ Rooms: <strong>${g.rooms || 0}</strong> ${g.roomType || ''}</span>` : ''}
+                ${cfg.side && g.side ? `<span>Side: ${g.side}</span>` : ''}
+              </div>
+
+              <div class="quick-actions">
+                <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); editGuest('${g.id}')">Edit</button>
+                ${g.phone ? `<button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); App.openWhatsApp('${g.phone}')">WhatsApp</button>` : ''}
+                <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteGuestConfirm('${g.id}')">Delete</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleGuest(id) {
+      expandedGuestId = expandedGuestId === id ? null : id;
+      renderGuestList();
+    }
+
+    function toggleStatus(guestId, field) {
+      const event = App.getCurrentEvent();
+      if (!event || !currentSubEventId) return;
+      const guest = event.guests.find(g => g.id === guestId);
+      if (!guest) return;
+
+      if (!guest.subEventStatus) guest.subEventStatus = {};
+      if (!guest.subEventStatus[currentSubEventId]) {
+        guest.subEventStatus[currentSubEventId] = { invited: false, confirmed: false, attended: false };
+      }
+
+      const st = guest.subEventStatus[currentSubEventId];
+      st[field] = !st[field];
+
+      // Auto logic: if attended → confirmed + invited
+      if (field === 'attended' && st.attended) {
+        st.confirmed = true;
+        st.invited = true;
+      }
+      if (field === 'confirmed' && st.confirmed) {
+        st.invited = true;
+      }
+
+      App.updateGuest(event.id, guestId, { subEventStatus: guest.subEventStatus });
+      renderGuestList();
+    }
+
+    function showAddGuest() {
+      document.getElementById('guestModalTitle').textContent = 'Add Family';
+      document.getElementById('editingGuestId').value = '';
+      document.getElementById('headName').value = '';
+      document.getElementById('phone').value = '';
+      document.getElementById('totalPeople').value = 1;
+      document.getElementById('members').value = '';
+      document.getElementById('address').value = '';
+      document.getElementById('shagan').value = 0;
+      document.getElementById('rooms').value = 0;
+      document.getElementById('roomType').value = '';
+      document.getElementById('returnGift').checked = false;
+      document.getElementById('side').value = '';
+      document.getElementById('notes').value = '';
+      applyColumnVisibilityToForm();
+      document.getElementById('guestModal').classList.add('show');
+    }
+
+    function editGuest(id) {
+      const event = App.getCurrentEvent();
+      const g = event.guests.find(x => x.id === id);
+      if (!g) return;
+
+      document.getElementById('guestModalTitle').textContent = 'Edit Family';
+      document.getElementById('editingGuestId').value = id;
+      document.getElementById('headName').value = g.headName || '';
+      document.getElementById('phone').value = g.phone || '';
+      document.getElementById('totalPeople').value = g.totalPeople || 1;
+      document.getElementById('members').value = (g.members || []).join(', ');
+      document.getElementById('address').value = g.address || '';
+      document.getElementById('shagan').value = g.shagan || 0;
+      document.getElementById('rooms').value = g.rooms || 0;
+      document.getElementById('roomType').value = g.roomType || '';
+      document.getElementById('returnGift').checked = !!g.returnGift;
+      document.getElementById('side').value = g.side || '';
+      document.getElementById('notes').value = g.notes || '';
+      applyColumnVisibilityToForm();
+      document.getElementById('guestModal').classList.add('show');
+    }
+
+    function applyColumnVisibilityToForm() {
+      const event = App.getCurrentEvent();
+      const cfg = event?.columnConfig || {};
+      document.getElementById('returnGiftGroup').style.display = cfg.returnGift === false ? 'none' : 'flex';
+      document.getElementById('shaganGroup').style.display = cfg.shagan === false ? 'none' : 'block';
+      document.getElementById('roomsGroup').style.display = cfg.rooms === false ? 'none' : 'block';
+      document.getElementById('roomTypeGroup').style.display = cfg.rooms === false ? 'none' : 'block';
+      document.getElementById('addressGroup').style.display = cfg.address === false ? 'none' : 'block';
+      document.getElementById('sideGroup').style.display = cfg.side ? 'block' : 'none';
+      document.getElementById('notesGroup').style.display = cfg.notes ? 'block' : 'none';
+    }
+
+    function closeGuestModal() {
+      document.getElementById('guestModal').classList.remove('show');
+    }
+
+    function saveGuest() {
+      const headName = document.getElementById('headName').value.trim();
+      if (!headName) {
+        alert('Family Head Name is required');
+        return;
+      }
+
+      const event = App.getCurrentEvent();
+      if (!event) return;
+
+      const membersRaw = document.getElementById('members').value.trim();
+      const members = membersRaw ? membersRaw.split(',').map(m => m.trim()).filter(Boolean) : [];
+
+      const payload = {
+        headName,
+        phone: document.getElementById('phone').value.trim(),
+        totalPeople: Number(document.getElementById('totalPeople').value) || 1,
+        members,
+        address: document.getElementById('address').value.trim(),
+        shagan: Number(document.getElementById('shagan').value) || 0,
+        rooms: Number(document.getElementById('rooms').value) || 0,
+        roomType: document.getElementById('roomType').value.trim(),
+        returnGift: document.getElementById('returnGift').checked,
+        side: document.getElementById('side').value,
+        notes: document.getElementById('notes').value.trim()
+      };
+
+      const editingId = document.getElementById('editingGuestId').value;
+      if (editingId) {
+        App.updateGuest(event.id, editingId, payload);
+      } else {
+        App.addGuest(event.id, payload);
+      }
+
+      closeGuestModal();
+      renderGuestList();
+    }
+
+    function deleteGuestConfirm(id) {
+      if (!confirm('Delete this family from the guest list?')) return;
+      const event = App.getCurrentEvent();
+      App.deleteGuest(event.id, id);
+      if (expandedGuestId === id) expandedGuestId = null;
+      renderGuestList();
+    }
+
+    // Column config
+    function showColumnConfig() {
+      const event = App.getCurrentEvent();
+      if (!event) return;
+      const cfg = event.columnConfig || {};
+      document.getElementById('col_returnGift').checked = cfg.returnGift !== false;
+      document.getElementById('col_shagan').checked = cfg.shagan !== false;
+      document.getElementById('col_rooms').checked = cfg.rooms !== false;
+      document.getElementById('col_address').checked = cfg.address !== false;
+      document.getElementById('col_side').checked = !!cfg.side;
+      document.getElementById('col_notes').checked = !!cfg.notes;
+      document.getElementById('columnModal').classList.add('show');
+    }
+
+    function closeColumnConfig() {
+      document.getElementById('columnModal').classList.remove('show');
+    }
+
+    function saveColumnConfig() {
+      const event = App.getCurrentEvent();
+      if (!event) return;
+      const cfg = {
+        returnGift: document.getElementById('col_returnGift').checked,
+        shagan: document.getElementById('col_shagan').checked,
+        rooms: document.getElementById('col_rooms').checked,
+        address: document.getElementById('col_address').checked,
+        side: document.getElementById('col_side').checked,
+        notes: document.getElementById('col_notes').checked
+      };
+      App.updateEvent(event.id, { columnConfig: cfg });
+      closeColumnConfig();
+      renderGuestList();
+    }
+
+    // Import
+    function showImportModal() {
+      document.getElementById('importFile').value = '';
+      document.getElementById('importPreview').innerHTML = '';
+      document.getElementById('importModal').classList.add('show');
+    }
+
+    function closeImportModal() {
+      document.getElementById('importModal').classList.remove('show');
+    }
+
+    function doImport() {
+      const fileInput = document.getElementById('importFile');
+      if (!fileInput.files.length) {
+        alert('Please select a CSV file');
+        return;
+      }
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length < 2) {
+          alert('File seems empty or has no data rows');
+          return;
+        }
+
+        // Simple CSV parse
+        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+        const event = App.getCurrentEvent();
+        let added = 0;
+
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
+          const get = (names) => {
+            for (const n of names) {
+              const idx = headers.findIndex(h => h.includes(n));
+              if (idx >= 0 && cols[idx]) return cols[idx];
+            }
+            return '';
+          };
+
+          const headName = get(['head', 'name', 'family']);
+          if (!headName) continue;
+
+          const membersRaw = get(['member', 'individual']);
+          const members = membersRaw ? membersRaw.split(/[;|]/).map(m => m.trim()).filter(Boolean) : [];
+
+          App.addGuest(event.id, {
+            headName,
+            phone: get(['phone', 'mobile', 'contact', 'number']),
+            totalPeople: Number(get(['total', 'people', 'pax', 'count'])) || (members.length || 1),
+            members,
+            address: get(['address', 'city', 'location']),
+            shagan: Number(get(['shagan', 'sagan', 'gift amount', 'amount'])) || 0,
+            rooms: Number(get(['room'])) || 0,
+            roomType: get(['room type', 'type']),
+            returnGift: false
+          });
+          added++;
+        }
+
+        closeImportModal();
+        renderGuestList();
+        alert(`Imported ${added} families successfully.`);
+      };
+      reader.readAsText(file);
+    }
+
+    // Init
+    init();
+  </script>
+</body>
+</html>

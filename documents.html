@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#6b4e71">
+  <title>Documents - Event Planner</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="top-row">
+      <h1>Documents & Terms</h1>
+    </div>
+    <div class="subtitle" id="eventSubtitle"></div>
+  </header>
+
+  <div class="container" id="mainContent">
+    <!-- filled by JS -->
+  </div>
+
+  <button class="fab" onclick="showAddDoc()">+</button>
+
+  <nav class="bottom-nav">
+    <a href="index.html" class="nav-item">
+      <span class="icon">📊</span>
+      Dashboard
+    </a>
+    <a href="guests.html" class="nav-item">
+      <span class="icon">👥</span>
+      Guests
+    </a>
+    <a href="events.html" class="nav-item">
+      <span class="icon">📅</span>
+      Events
+    </a>
+    <a href="documents.html" class="nav-item active">
+      <span class="icon">📄</span>
+      Docs
+    </a>
+    <a href="share.html" class="nav-item">
+      <span class="icon">📤</span>
+      Share
+    </a>
+  </nav>
+
+  <!-- Add/Edit Document Modal -->
+  <div class="modal-overlay" id="docModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="docModalTitle">Add Document / Note</h3>
+        <button class="btn btn-sm btn-outline" onclick="closeDocModal()">Close</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editingDocId">
+        <div class="form-group">
+          <label>Title *</label>
+          <input type="text" class="form-control" id="docTitle" placeholder="e.g. Banquet Contract, Food Menu, Décor Terms">
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select class="form-control" id="docCategory">
+            <option value="Banquet">Banquet / Venue</option>
+            <option value="Food">Food & Menu</option>
+            <option value="Decor">Décor</option>
+            <option value="Travel">Travel</option>
+            <option value="Rooms">Rooms / Hotel</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Details / Notes</label>
+          <textarea class="form-control" id="docContent" rows="6" placeholder="Write menu items, number of plates, costs, terms agreed, etc."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Amount / Cost (₹)</label>
+            <input type="number" class="form-control" id="docAmount" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" class="form-control" id="docDate">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeDocModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveDoc()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    function render() {
+      const event = App.getCurrentEvent();
+      const container = document.getElementById('mainContent');
+      const sub = document.getElementById('eventSubtitle');
+
+      if (!event) {
+        sub.textContent = '';
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📄</div>
+            <p>No event selected.</p>
+            <a href="index.html" class="btn btn-primary">Go to Dashboard</a>
+          </div>`;
+        return;
+      }
+
+      sub.textContent = event.name;
+      const docs = event.documents || [];
+
+      if (!docs.length) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📄</div>
+            <p>Store banquet terms, food menu, costs, number of plates, décor notes etc. here.</p>
+            <button class="btn btn-primary" onclick="showAddDoc()">+ Add First Document</button>
+          </div>`;
+        return;
+      }
+
+      // Group by category
+      const groups = {};
+      docs.forEach(d => {
+        const cat = d.category || 'Other';
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(d);
+      });
+
+      let html = '';
+      for (const [cat, items] of Object.entries(groups)) {
+        html += `<div class="card"><div class="card-title">${cat}</div>`;
+        items.forEach(d => {
+          html += `
+            <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+              <div class="flex-between">
+                <strong>${d.title}</strong>
+                <div>
+                  <button class="btn btn-sm btn-outline" onclick="editDoc('${d.id}')">Edit</button>
+                  <button class="btn btn-sm btn-danger" onclick="deleteDoc('${d.id}')">×</button>
+                </div>
+              </div>
+              ${d.amount ? `<div class="text-sm" style="color:var(--primary);font-weight:600;margin:4px 0">${App.formatMoney(d.amount)}</div>` : ''}
+              ${d.date ? `<div class="text-sm text-muted">${d.date}</div>` : ''}
+              ${d.content ? `<div class="text-sm mt-1" style="white-space:pre-wrap">${d.content}</div>` : ''}
+            </div>
+          `;
+        });
+        html += `</div>`;
+      }
+
+      container.innerHTML = html;
+    }
+
+    function showAddDoc() {
+      document.getElementById('docModalTitle').textContent = 'Add Document / Note';
+      document.getElementById('editingDocId').value = '';
+      document.getElementById('docTitle').value = '';
+      document.getElementById('docCategory').value = 'Banquet';
+      document.getElementById('docContent').value = '';
+      document.getElementById('docAmount').value = 0;
+      document.getElementById('docDate').value = '';
+      document.getElementById('docModal').classList.add('show');
+    }
+
+    function editDoc(id) {
+      const event = App.getCurrentEvent();
+      const doc = (event.documents || []).find(d => d.id === id);
+      if (!doc) return;
+      document.getElementById('docModalTitle').textContent = 'Edit Document';
+      document.getElementById('editingDocId').value = id;
+      document.getElementById('docTitle').value = doc.title || '';
+      document.getElementById('docCategory').value = doc.category || 'Other';
+      document.getElementById('docContent').value = doc.content || '';
+      document.getElementById('docAmount').value = doc.amount || 0;
+      document.getElementById('docDate').value = doc.date || '';
+      document.getElementById('docModal').classList.add('show');
+    }
+
+    function closeDocModal() {
+      document.getElementById('docModal').classList.remove('show');
+    }
+
+    function saveDoc() {
+      const title = document.getElementById('docTitle').value.trim();
+      if (!title) {
+        alert('Title is required');
+        return;
+      }
+      const event = App.getCurrentEvent();
+      if (!event) return;
+
+      const docs = event.documents || [];
+      const editingId = document.getElementById('editingDocId').value;
+
+      const payload = {
+        id: editingId || App.generateId(),
+        title,
+        category: document.getElementById('docCategory').value,
+        content: document.getElementById('docContent').value.trim(),
+        amount: Number(document.getElementById('docAmount').value) || 0,
+        date: document.getElementById('docDate').value,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (editingId) {
+        const idx = docs.findIndex(d => d.id === editingId);
+        if (idx >= 0) docs[idx] = payload;
+      } else {
+        docs.push(payload);
+      }
+
+      App.updateEvent(event.id, { documents: docs });
+      closeDocModal();
+      render();
+    }
+
+    function deleteDoc(id) {
+      if (!confirm('Delete this document?')) return;
+      const event = App.getCurrentEvent();
+      const docs = (event.documents || []).filter(d => d.id !== id);
+      App.updateEvent(event.id, { documents: docs });
+      render();
+    }
+
+    render();
+  </script>
+</body>
+</html>
